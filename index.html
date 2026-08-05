@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Toko Sederhana</title>
+    <style>
+        /* Gaya minimalis */
+        * { box-sizing: border-box; font-family: sans-serif; margin: 0; padding: 0; }
+        body { background: #f9fafc; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; display: flex; gap: 20px; flex-wrap: wrap; }
+        .produk-grid { flex: 2; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 12px; }
+        .card { background: white; border-radius: 8px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; }
+        .card h4 { margin: 6px 0; }
+        .card .harga { color: #2563eb; font-weight: bold; }
+        .card .stok { font-size: 13px; color: #64748b; }
+        .card button { background: #2563eb; color: white; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; margin-top: 6px; width:100%; }
+        .card button:disabled { background: #94a3b8; cursor: not-allowed; }
+        .cart { flex: 1; background: white; border-radius: 8px; padding: 16px; border:1px solid #e2e8f0; align-self: flex-start; }
+        .cart h3 { border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+        .cart-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size:14px; }
+        .cart-item .qty-control { display: flex; gap: 4px; align-items: center; }
+        .cart-item .qty-control button { width: 24px; height: 24px; border-radius: 50%; border:1px solid #cbd5e1; background: white; cursor: pointer; }
+        .cart-empty { color: #94a3b8; padding: 12px 0; text-align: center; }
+        .summary { margin-top: 12px; border-top: 2px solid #e2e8f0; padding-top: 12px; }
+        .summary div { display: flex; justify-content: space-between; padding: 3px 0; font-size:14px; }
+        .summary .total { font-weight: bold; font-size: 18px; border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 4px; }
+        .btn-checkout { background: #0f172a; color: white; border: none; padding: 10px; border-radius: 40px; font-weight: bold; width:100%; margin-top:12px; cursor:pointer; }
+        .btn-checkout:disabled { background: #94a3b8; cursor: not-allowed; }
+        @media (max-width: 700px) { .container { flex-direction: column; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Daftar Produk -->
+    <div class="produk-grid" id="produkGrid"></div>
+
+    <!-- Keranjang -->
+    <div class="cart" id="cartSidebar">
+        <h3>🛒 Keranjang (<span id="jumlahItem">0</span>)</h3>
+        <div id="daftarCart">
+            <div class="cart-empty">Belum ada barang</div>
+        </div>
+        <div class="summary">
+            <div><span>Subtotal</span><span id="subtotal">Rp0</span></div>
+            <div style="color:#16a34a;"><span>Diskon (10% jika >500rb)</span><span id="diskon">-Rp0</span></div>
+            <div style="color:#dc2626;"><span>Pajak (11%)</span><span id="pajak">Rp0</span></div>
+            <div class="total"><span>Grand Total</span><span id="grandTotal">Rp0</span></div>
+            <button class="btn-checkout" id="btnCheckout" disabled>Checkout</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ----- DATA PRODUK (bisa ditambah) -----
+const produk = [
+    { id:1, nama:'Smartphone X', harga:3500000, stok:10 },
+    { id:2, nama:'Headphone', harga:850000, stok:5 },
+    { id:3, nama:'Power Bank', harga:250000, stok:20 },
+    { id:4, nama:'Smartwatch', harga:1200000, stok:3 },
+];
+
+// ----- STATE KERANJANG (object: id => qty) -----
+let cart = {};
+
+// ----- RENDER PRODUK -----
+function renderProduk() {
+    const grid = document.getElementById('produkGrid');
+    grid.innerHTML = '';
+    produk.forEach(p => {
+        const qtyDiCart = cart[p.id] || 0;
+        const sisa = p.stok - qtyDiCart;
+        const habis = sisa <= 0;
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <h4>${p.nama}</h4>
+            <div class="harga">Rp${p.harga.toLocaleString('id-ID')}</div>
+            <div class="stok">${habis ? '❌ Habis' : '✅ Stok '+sisa}</div>
+            <button ${habis ? 'disabled' : ''} onclick="tambah(${p.id})">+ Tambah</button>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+// ----- FUNGSI KERANJANG -----
+function tambah(id) {
+    const p = produk.find(x => x.id === id);
+    if (!p) return;
+    const qty = cart[id] || 0;
+    if (qty >= p.stok) return alert('Stok habis!');
+    cart[id] = (cart[id] || 0) + 1;
+    updateUI();
+}
+
+function kurang(id) {
+    if (!cart[id]) return;
+    cart[id] -= 1;
+    if (cart[id] <= 0) delete cart[id];
+    updateUI();
+}
+
+function hapus(id) {
+    delete cart[id];
+    updateUI();
+}
+
+// ----- RENDER KERANJANG & SUMMARY -----
+function renderCart() {
+    const container = document.getElementById('daftarCart');
+    const jumlah = Object.values(cart).reduce((a,b) => a+b, 0);
+    document.getElementById('jumlahItem').textContent = jumlah;
+
+    if (jumlah === 0) {
+        container.innerHTML = '<div class="cart-empty">Belum ada barang</div>';
+        return;
+    }
+
+    let html = '';
+    for (const [id, qty] of Object.entries(cart)) {
+        const p = produk.find(x => x.id === parseInt(id));
+        if (!p) continue;
+        html += `
+            <div class="cart-item">
+                <span>${p.nama} (${qty})</span>
+                <div class="qty-control">
+                    <button onclick="kurang(${p.id})">−</button>
+                    <button onclick="hapus(${p.id})" style="color:red;border-color:#fecaca;">✕</button>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+function renderSummary() {
+    const subtotal = Object.entries(cart).reduce((sum, [id, qty]) => {
+        const p = produk.find(x => x.id === parseInt(id));
+        return sum + (p ? p.harga * qty : 0);
+    }, 0);
+
+    const diskon = subtotal > 500000 ? subtotal * 0.1 : 0;
+    const setelahDiskon = subtotal - diskon;
+    const pajak = setelahDiskon * 0.11;
+    const grandTotal = setelahDiskon + pajak;
+
+    document.getElementById('subtotal').textContent = 'Rp'+subtotal.toLocaleString('id-ID');
+    document.getElementById('diskon').textContent = '-Rp'+diskon.toLocaleString('id-ID');
+    document.getElementById('pajak').textContent = 'Rp'+pajak.toLocaleString('id-ID');
+    document.getElementById('grandTotal').textContent = 'Rp'+grandTotal.toLocaleString('id-ID');
+
+    const btn = document.getElementById('btnCheckout');
+    btn.disabled = subtotal === 0;
+    btn.textContent = subtotal === 0 ? 'Checkout' : 'Bayar Rp'+grandTotal.toLocaleString('id-ID');
+}
+
+function updateUI() {
+    renderProduk();
+    renderCart();
+    renderSummary();
+}
+
+// ----- CHECKOUT (sederhana) -----
+function checkout() {
+    const subtotal = getSubtotal();
+    if (subtotal === 0) return;
+    const diskon = subtotal > 500000 ? subtotal * 0.1 : 0;
+    const pajak = (subtotal - diskon) * 0.11;
+    const total = subtotal - diskon + pajak;
+
+    const bayar = prompt(`Total yang harus dibayar: Rp${total.toLocaleString('id-ID')}\nMasukkan jumlah uang:`, total);
+    if (bayar === null) return;
+    const uang = parseInt(bayar.replace(/[^0-9]/g,''));
+    if (isNaN(uang) || uang < total) {
+        alert('Uang kurang!');
+        return;
+    }
+    alert(`✅ Pembayaran berhasil!\nKembalian: Rp${(uang - total).toLocaleString('id-ID')}`);
+    cart = {};  // kosongkan keranjang
+    updateUI();
+}
+
+// helper untuk subtotal (dipakai di checkout)
+function getSubtotal() {
+    return Object.entries(cart).reduce((sum, [id, qty]) => {
+        const p = produk.find(x => x.id === parseInt(id));
+        return sum + (p ? p.harga * qty : 0);
+    }, 0);
+}
+
+// Event listener checkout
+document.getElementById('btnCheckout').addEventListener('click', checkout);
+
+// ----- START -----
+updateUI();
+</script>
+</body>
+</html>
